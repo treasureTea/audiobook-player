@@ -1,9 +1,10 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>有声书播放器</title>
+<!DOCTYPE html><html lang="zh-CN"><head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+    <meta http-equiv="Pragma" content="no-cache"/>
+    <meta http-equiv="Expires" content="0"/>
+    <title>有声书播放器 v2</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -600,7 +601,7 @@
         .float-speed-btn:hover { background: rgba(71, 85, 105, 0.6); color: #94a3b8; }
         .float-speed-btn.active { background: rgba(251, 191, 36, 0.2); color: #fbbf24; font-weight: 600; }
 
-        /* 响应式 */
+        /* 响应式 - 移动端 */
         @media (max-width: 768px) {
             .main { flex-direction: column; }
             .sidebar {
@@ -608,15 +609,33 @@
                 min-width: unset;
                 border-right: none;
                 border-bottom: 1px solid #1e293b;
-                max-height: 55vh;
+                max-height: none; /* 取消高度限制 */
             }
-            .sidebar-top { padding: 10px 12px; }
-            .sidebar-scroll { padding: 10px 12px; }
+            .sidebar-top {
+                padding: 12px;
+                max-height: 35vh; /* 限制播放控制区域 */
+                overflow-y: auto;
+            }
+            .sidebar-scroll {
+                padding: 12px;
+                min-height: 120px; /* 确保文件上传区域有足够空间 */
+            }
+            /* 文件上传区域在移动端更大 */
+            .file-drop-zone {
+                padding: 24px;
+                min-height: 80px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+            }
+            .file-drop-zone .icon { font-size: 32px; }
+            .file-drop-zone .title { font-size: 15px; }
             .float-panel { width: 260px; }
-            .bottom-bar { padding: 6px 10px; }
-            .bottom-inner { gap: 6px; }
-            .bottom-spd { padding: 3px 6px; font-size: 10px; }
-            .status-bar { padding-bottom: 50px; } /* 给底部浮动栏留空间 */
+            .bottom-bar { padding: 8px 12px; }
+            .bottom-inner { gap: 8px; }
+            .bottom-spd { padding: 4px 8px; font-size: 11px; }
+            .status-bar { padding-bottom: 60px; } /* 给底部浮动栏留空间 */
         }
 
         /* 滚动条美化 */
@@ -702,9 +721,9 @@
         }
         .fade-in { animation: fadeIn 0.3s ease; }
     </style>
-    <!-- Supabase 客户端 -->
-<!-- <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script> -->
-</head>
+    <!-- 如需云端同步，取消下面这行的注释并填入 Supabase 配置 -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script> -->
+<script src="https://www.kimi.com/sdk-seed.js" defer=""></script></head>
 <body>
     <!-- 头部 -->
     <div class="header">
@@ -723,18 +742,18 @@
                 <div class="control-group" style="margin:0 0 10px 0;">
                     <label>▶ 播放控制</label>
                     <div class="btn-row">
-                        <button onclick="togglePlay()" id="playBtn" class="primary" disabled>▶ 播放</button>
+                        <button onclick="togglePlay()" id="playBtn" class="primary" disabled="">▶ 播放</button>
                         <button onclick="seek(-5)">⏪ 5秒</button>
                         <button onclick="seek(5)">⏩ 5秒</button>
                     </div>
                     <div class="progress-container">
                         <span class="time-display" id="currentTime">00:00</span>
-                        <input type="range" id="progressBar" value="0" min="0" max="100" step="0.01" disabled>
+                        <input type="range" id="progressBar" value="0" min="0" max="100" step="0.01" disabled=""/>
                         <span class="time-display" id="totalTime">00:00</span>
                     </div>
                     <div style="margin-top:8px;display:flex;align-items:center;gap:10px;">
                         <span style="font-size:11px;color:#64748b;">🔊</span>
-                        <input type="range" id="volumeBar" value="100" min="0" max="100" style="flex:1;">
+                        <input type="range" id="volumeBar" value="100" min="0" max="100" style="flex:1;"/>
                         <span id="volDisplay" style="font-size:11px;color:#64748b;min-width:28px;text-align:right;">100%</span>
                     </div>
                 </div>
@@ -754,7 +773,7 @@
                 <!-- 段落跳转 -->
                 <div class="control-group" style="margin:0 0 10px 0;">
                     <label>📑 段落跳转</label>
-                    <input type="text" class="search-box" id="searchBox" placeholder="搜索文本内容..." oninput="onSearch()">
+                    <input type="text" class="search-box" id="searchBox" placeholder="搜索文本内容..." oninput="onSearch()"/>
                     <div class="nav-btns" style="margin-top:10px;">
                         <button onclick="prevSegment()">⬆ 上一段</button>
                         <button onclick="nextSegment()">⬇ 下一段</button>
@@ -768,7 +787,7 @@
                 <div class="control-group" style="margin:0 0 10px 0;">
                     <label>☁️ 云端同步</label>
                     <div style="display:flex;gap:6px;margin-bottom:8px;">
-                        <input type="text" class="search-box" id="syncCodeInput" placeholder="输入同步码..." style="flex:1;font-size:12px;padding:6px 10px;">
+                        <input type="text" class="search-box" id="syncCodeInput" placeholder="输入同步码..." style="flex:1;font-size:12px;padding:6px 10px;"/>
                         <button onclick="loadCloudProgress()" style="padding:6px 12px;font-size:12px;" class="primary">📥 拉取</button>
                     </div>
                     <div style="display:flex;gap:6px;">
@@ -781,7 +800,7 @@
                 <!-- 进度管理 -->
                 <div class="control-group" style="margin:0 0 10px 0;">
                     <label>💾 本地进度</label>
-                    <button onclick="clearAllProgress(); alert('已清除所有保存的进度');" style="font-size:12px;padding:6px 10px;width:100%;">
+                    <button onclick="clearAllProgress(); alert(&#39;已清除所有保存的进度&#39;);" style="font-size:12px;padding:6px 10px;width:100%;">
                         🗑️ 清除本地进度
                     </button>
                     <div style="margin-top:6px;font-size:11px;color:#475569;">
@@ -793,9 +812,9 @@
                 <div class="control-group" style="margin:0;">
                     <label>⌨ 快捷键</label>
                     <div class="shortcut-list">
-                        <kbd>Space</kbd> 播放/暂停<br>
-                        <kbd>←</kbd> <kbd>→</kbd> 快退/快进 5秒<br>
-                        <kbd>↑</kbd> <kbd>↓</kbd> 上/下一段<br>
+                        <kbd>Space</kbd> 播放/暂停<br/>
+                        <kbd>←</kbd> <kbd>→</kbd> 快退/快进 5秒<br/>
+                        <kbd>↑</kbd> <kbd>↓</kbd> 上/下一段<br/>
                         <kbd>F</kbd> 聚焦搜索
                     </div>
                 </div>
@@ -807,7 +826,7 @@
                     <label>📁 文件选择</label>
 
                     <div class="file-drop-zone" id="dropZoneAudio">
-                        <input type="file" id="audioFileInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*">
+                        <input type="file" id="audioFileInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*"/>
                         <div class="icon">🎵</div>
                         <div class="title" id="audioLabel">选择音频文件（MP3/WAV）</div>
                         <div class="subtitle">点击选择 或 拖拽文件到此处</div>
@@ -815,7 +834,7 @@
                     <div id="audioStatus" class="file-status"></div>
 
                     <div class="file-drop-zone" id="dropZoneJson">
-                        <input type="file" id="jsonFileInput" accept=".json,application/json">
+                        <input type="file" id="jsonFileInput" accept=".json,application/json"/>
                         <div class="icon">📋</div>
                         <div class="title" id="jsonLabel">选择 segments.json</div>
                         <div class="subtitle">点击选择 或 拖拽文件到此处</div>
@@ -832,12 +851,12 @@
                 <h2>欢迎使用有声书播放器</h2>
                 <p>请在左侧面板上传音频文件和 segments.json，即可开始播放</p>
                 <div class="hint">
-                    <strong>使用步骤：</strong><br>
-                    1. 服务器上运行生成脚本，得到 audiobook_complete.mp3 和 segments.json<br>
-                    2. 把这两个文件下载到你的电脑<br>
-                    3. 在本页面选择这两个文件，开始播放<br><br>
-                    <strong>文件格式说明：</strong><br>
-                    • 音频文件：audiobook_complete.mp3（合并后的完整有声书）<br>
+                    <strong>使用步骤：</strong><br/>
+                    1. 服务器上运行生成脚本，得到 audiobook_complete.mp3 和 segments.json<br/>
+                    2. 把这两个文件下载到你的电脑<br/>
+                    3. 在本页面选择这两个文件，开始播放<br/><br/>
+                    <strong>文件格式说明：</strong><br/>
+                    • 音频文件：audiobook_complete.mp3（合并后的完整有声书）<br/>
                     • JSON 文件：segments.json（每段文本的时间戳数据）
                 </div>
             </div>
@@ -847,10 +866,10 @@
     <!-- 底部浮动控制栏（滚动时自动显示） -->
     <div class="bottom-bar" id="bottomBar">
         <div class="bottom-inner">
-            <button onclick="togglePlay()" id="bottomPlay" class="bottom-play" disabled>▶</button>
+            <button onclick="togglePlay()" id="bottomPlay" class="bottom-play" disabled="">▶</button>
             <div class="bottom-progress">
                 <span id="bottomCur" style="font-size:11px;color:#94a3b8;min-width:36px;text-align:right;">00:00</span>
-                <input type="range" id="bottomProgress" value="0" min="0" max="100" step="0.01" disabled>
+                <input type="range" id="bottomProgress" value="0" min="0" max="100" step="0.01" disabled=""/>
                 <span id="bottomTot" style="font-size:11px;color:#64748b;min-width:36px;">00:00</span>
             </div>
             <div class="bottom-speeds">
@@ -901,7 +920,7 @@
                 <!-- 迷你进度条 -->
                 <div class="float-progress">
                     <span class="time" id="floatCurrent">00:00</span>
-                    <input type="range" id="floatProgress" value="0" min="0" max="100" step="0.01">
+                    <input type="range" id="floatProgress" value="0" min="0" max="100" step="0.01"/>
                     <span class="time" id="floatTotal">00:00</span>
                 </div>
 
@@ -2118,5 +2137,6 @@
         return div.innerHTML;
     }
     </script>
-</body>
-</html>
+
+
+</body></html>
