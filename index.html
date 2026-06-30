@@ -1,0 +1,2122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>有声书播放器</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0f172a;
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ========== 头部 ========== */
+        .header {
+            padding: 12px 20px;
+            border-bottom: 1px solid #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            background: #0f172a;
+        }
+        .header h1 { font-size: 16px; color: #fbbf24; font-weight: 600; }
+        .file-info { color: #64748b; font-size: 13px; }
+
+        /* ========== 主布局 ========== */
+        .main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* ========== 侧边栏 ========== */
+        .sidebar {
+            width: 340px;
+            min-width: 300px;
+            border-right: 1px solid #1e293b;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #0f172a;
+        }
+
+        /* 侧边栏顶部：所有播放相关功能（固定，但内容过多时可内部滚动） */
+        .sidebar-top {
+            padding: 12px 16px;
+            border-bottom: 1px solid #334155;
+            background: #0f172a;
+            flex-shrink: 0;
+            max-height: 75vh;
+            overflow-y: auto;
+        }
+
+        /* 侧边栏底部：文件上传（可滚动） */
+        .sidebar-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .control-group {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 12px;
+        }
+        .control-group label {
+            display: block;
+            font-size: 11px;
+            color: #64748b;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            font-weight: 600;
+        }
+
+        /* 文件上传区 */
+        .file-drop-zone {
+            border: 2px dashed #334155;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 8px;
+            position: relative;
+        }
+        .file-drop-zone:hover, .file-drop-zone.dragover {
+            border-color: #fbbf24;
+            background: rgba(251, 191, 36, 0.05);
+        }
+        .file-drop-zone .icon { font-size: 28px; margin-bottom: 6px; }
+        .file-drop-zone .title { font-size: 13px; color: #94a3b8; }
+        .file-drop-zone .subtitle { font-size: 11px; color: #475569; margin-top: 4px; }
+        .file-drop-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .file-status {
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            margin-top: 8px;
+            display: none;
+        }
+        .file-status.ok { display: block; background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+        .file-status.pending { display: block; background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+
+        /* 音频控制 */
+        .audio-wrapper { margin: 8px 0; }
+        .audio-wrapper audio { width: 100%; height: 36px; border-radius: 8px; }
+
+        .progress-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .time-display {
+            font-size: 12px;
+            color: #64748b;
+            font-variant-numeric: tabular-nums;
+            min-width: 72px;
+            text-align: center;
+        }
+        input[type="range"] {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 5px;
+            background: #334155;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #fbbf24;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid #0f172a;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            background: #fbbf24;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid #0f172a;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        button {
+            background: #334155;
+            color: #e2e8f0;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.15s;
+            font-family: inherit;
+        }
+        button:hover { background: #475569; }
+        button:active { transform: scale(0.97); }
+        button.primary {
+            background: #fbbf24;
+            color: #0f172a;
+            font-weight: 600;
+        }
+        button.primary:hover { background: #f59e0b; }
+        button.active { background: #fbbf24; color: #0f172a; font-weight: 600; }
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .nav-btns { display: flex; gap: 6px; }
+        .nav-btns button { flex: 1; }
+
+        .speed-btn { padding: 5px 10px; font-size: 11px; }
+
+        .shortcut-list {
+            font-size: 12px;
+            color: #64748b;
+            line-height: 2;
+        }
+        .shortcut-list kbd {
+            background: #334155;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #94a3b8;
+            font-family: monospace;
+        }
+
+        /* ========== 内容区 ========== */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+            scroll-behavior: smooth;
+        }
+        .segment-list {
+            max-width: 780px;
+            margin: 0 auto;
+        }
+
+        .segment {
+            padding: 14px 18px;
+            margin: 6px 0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            border-left: 3px solid transparent;
+            font-size: 17px;
+            line-height: 1.85;
+            color: #475569;
+            position: relative;
+        }
+        .segment:hover {
+            background: #1e293b;
+            color: #94a3b8;
+        }
+        .segment.active {
+            background: linear-gradient(135deg, #1e293b 0%, #162032 100%);
+            border-left-color: #fbbf24;
+            color: #f1f5f9;
+            box-shadow: 0 0 24px rgba(251, 191, 36, 0.08);
+        }
+        .segment.active .seg-index { color: #fbbf24; }
+        .segment.played { color: #334155; }
+
+        .seg-index {
+            font-size: 11px;
+            color: #334155;
+            margin-bottom: 2px;
+            font-variant-numeric: tabular-nums;
+            font-weight: 500;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            text-align: center;
+            padding: 40px;
+        }
+        .empty-state .icon { font-size: 56px; margin-bottom: 16px; opacity: 0.6; }
+        .empty-state h2 { font-size: 18px; color: #94a3b8; margin-bottom: 8px; font-weight: 500; }
+        .empty-state p { font-size: 14px; color: #475569; line-height: 1.8; max-width: 420px; }
+        .empty-state .hint {
+            margin-top: 20px;
+            padding: 14px 18px;
+            background: #1e293b;
+            border-radius: 10px;
+            font-size: 12px;
+            color: #64748b;
+            text-align: left;
+            line-height: 2;
+        }
+
+        /* 底部状态栏 */
+        .status-bar {
+            padding: 10px 20px;
+            border-top: 1px solid #1e293b;
+            font-size: 12px;
+            color: #475569;
+            display: flex;
+            gap: 16px;
+            background: #0f172a;
+        }
+
+        /* 搜索 */
+        .search-box {
+            width: 100%;
+            padding: 8px 12px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 13px;
+            outline: none;
+            font-family: inherit;
+        }
+        .search-box:focus { border-color: #fbbf24; }
+        .search-box::placeholder { color: #475569; }
+
+        /* ========== 悬浮窗 ========== */
+        .float-window {
+            position: fixed;
+            z-index: 9999;
+            user-select: none;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        /* 收起状态：小圆球 */
+        .float-ball {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(251, 191, 36, 0.35), 0 0 0 1px rgba(251,191,36,0.2);
+            transition: all 0.2s ease;
+        }
+        .float-ball:hover {
+            transform: scale(1.08);
+            box-shadow: 0 6px 28px rgba(251, 191, 36, 0.5);
+        }
+        .float-ball:active { transform: scale(0.95); }
+        .float-ball.playing {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 4px 20px rgba(251, 191, 36, 0.35); }
+            50% { box-shadow: 0 4px 32px rgba(251, 191, 36, 0.6); }
+        }
+
+        /* 展开状态：控制面板 */
+        .float-panel {
+            width: 300px;
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            border-radius: 16px;
+            padding: 0;
+            overflow: hidden;
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+            display: none;
+        }
+        .float-panel.open { display: block; animation: floatIn 0.25s ease; }
+        @keyframes floatIn {
+            from { opacity: 0; transform: translateY(10px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .float-header {
+            padding: 12px 16px;
+            background: rgba(251, 191, 36, 0.1);
+            border-bottom: 1px solid rgba(251, 191, 36, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: grab;
+        }
+        .float-header:active { cursor: grabbing; }
+        .float-header-title {
+            font-size: 12px;
+            color: #fbbf24;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .float-header-btns {
+            display: flex;
+            gap: 4px;
+        }
+        .float-header-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.06);
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.15s;
+        }
+        .float-header-btn:hover {
+            background: rgba(255,255,255,0.12);
+            color: #e2e8f0;
+        }
+
+        .float-body {
+            padding: 14px 16px;
+        }
+
+        /* 当前段落预览 */
+        .float-segment-preview {
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            line-height: 1.7;
+            color: #cbd5e1;
+            max-height: 80px;
+            overflow: hidden;
+            position: relative;
+        }
+        .float-segment-preview::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 24px;
+            background: linear-gradient(to bottom, transparent, rgba(30,41,59,0.9));
+        }
+        .float-segment-preview .seg-label {
+            font-size: 10px;
+            color: #fbbf24;
+            margin-bottom: 2px;
+            font-weight: 600;
+        }
+
+        /* 迷你进度条 */
+        .float-progress {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .float-progress input[type="range"] {
+            flex: 1;
+            height: 4px;
+        }
+        .float-progress .time {
+            font-size: 11px;
+            color: #64748b;
+            font-variant-numeric: tabular-nums;
+            min-width: 34px;
+        }
+
+        /* 控制按钮 */
+        .float-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .float-btn {
+            background: rgba(51, 65, 85, 0.6);
+            color: #e2e8f0;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .float-btn:hover { background: rgba(71, 85, 105, 0.8); }
+        .float-btn:active { transform: scale(0.92); }
+        .float-btn.nav { width: 36px; height: 36px; font-size: 16px; }
+        .float-btn.play {
+            width: 44px;
+            height: 44px;
+            font-size: 20px;
+            background: #fbbf24;
+            color: #0f172a;
+        }
+        .float-btn.play:hover { background: #f59e0b; }
+        .float-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* 画中画按钮 */
+        .pip-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            margin-top: 10px;
+            padding: 6px 10px;
+            font-size: 11px;
+            background: rgba(51, 65, 85, 0.4);
+            color: #64748b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+            width: 100%;
+        }
+        .pip-btn:hover { background: rgba(71, 85, 105, 0.6); color: #94a3b8; border-color: #475569; }
+        .pip-btn.active { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border-color: rgba(251,191,36,0.3); }
+        .pip-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* 画中画窗口样式 */
+        .pip-window-body {
+            background: #0f172a;
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 16px;
+            min-width: 280px;
+        }
+        .pip-title {
+            font-size: 13px;
+            color: #fbbf24;
+            font-weight: 600;
+            margin-bottom: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .pip-text {
+            font-size: 14px;
+            line-height: 1.7;
+            color: #cbd5e1;
+            margin-bottom: 12px;
+            max-height: 100px;
+            overflow: hidden;
+            position: relative;
+        }
+        .pip-text::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 24px;
+            background: linear-gradient(to bottom, transparent, #0f172a);
+        }
+        .pip-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .pip-btn-sm {
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            background: #334155;
+            color: #e2e8f0;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .pip-btn-sm:hover { background: #475569; }
+        .pip-btn-play {
+            width: 42px; height: 42px;
+            font-size: 18px;
+            background: #fbbf24;
+            color: #0f172a;
+        }
+        .pip-btn-play:hover { background: #f59e0b; }
+        .pip-progress {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .pip-progress input[type="range"] {
+            flex: 1;
+            height: 4px;
+        }
+        .pip-time {
+            font-size: 10px;
+            color: #64748b;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        /* 速度选择 */
+        .float-speeds {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin-top: 12px;
+        }
+        .float-speed-btn {
+            padding: 3px 8px;
+            font-size: 10px;
+            border-radius: 5px;
+            background: rgba(51, 65, 85, 0.4);
+            color: #64748b;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .float-speed-btn:hover { background: rgba(71, 85, 105, 0.6); color: #94a3b8; }
+        .float-speed-btn.active { background: rgba(251, 191, 36, 0.2); color: #fbbf24; font-weight: 600; }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .main { flex-direction: column; }
+            .sidebar {
+                width: 100%;
+                min-width: unset;
+                border-right: none;
+                border-bottom: 1px solid #1e293b;
+                max-height: 55vh;
+            }
+            .sidebar-top { padding: 10px 12px; }
+            .sidebar-scroll { padding: 10px 12px; }
+            .float-panel { width: 260px; }
+            .bottom-bar { padding: 6px 10px; }
+            .bottom-inner { gap: 6px; }
+            .bottom-spd { padding: 3px 6px; font-size: 10px; }
+            .status-bar { padding-bottom: 50px; } /* 给底部浮动栏留空间 */
+        }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* ========== 底部浮动控制栏 ========== */
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 9000;
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(251, 191, 36, 0.2);
+            padding: 8px 16px;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+        }
+        .bottom-bar.visible {
+            transform: translateY(0);
+        }
+        .bottom-inner {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .bottom-play {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #fbbf24;
+            color: #0f172a;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .bottom-play:disabled { opacity: 0.3; cursor: not-allowed; }
+        .bottom-play:hover { background: #f59e0b; }
+        .bottom-progress {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+        .bottom-progress input[type="range"] {
+            flex: 1;
+            min-width: 60px;
+        }
+        .bottom-speeds {
+            display: flex;
+            gap: 3px;
+            flex-shrink: 0;
+        }
+        .bottom-spd {
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 6px;
+            background: #334155;
+            color: #94a3b8;
+            border: none;
+            cursor: pointer;
+        }
+        .bottom-spd:hover { background: #475569; color: #e2e8f0; }
+        .bottom-spd.active { background: rgba(251, 191, 36, 0.2); color: #fbbf24; font-weight: 600; }
+
+        /* 淡入动画 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeIn 0.3s ease; }
+    </style>
+    <!-- Supabase 客户端 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <!-- 头部 -->
+    <div class="header">
+        <h1>📖 有声书播放器</h1>
+        <span id="fileInfo" class="file-info">请选择音频文件和 segments.json</span>
+        <button id="toggleFloatBtn" onclick="toggleFloatVisibility()" style="margin-left:auto;font-size:12px;padding:6px 12px;display:none;" title="显示/隐藏悬浮控制器">🎮 控制器</button>
+    </div>
+
+    <!-- 主内容 -->
+    <div class="main" id="mainArea">
+        <!-- 左侧：控制面板 -->
+        <div class="sidebar">
+            <!-- 顶部固定区：所有播放相关功能（始终可见） -->
+            <div class="sidebar-top">
+                <!-- 播放控制 -->
+                <div class="control-group" style="margin:0 0 10px 0;">
+                    <label>▶ 播放控制</label>
+                    <div class="btn-row">
+                        <button onclick="togglePlay()" id="playBtn" class="primary" disabled>▶ 播放</button>
+                        <button onclick="seek(-5)">⏪ 5秒</button>
+                        <button onclick="seek(5)">⏩ 5秒</button>
+                    </div>
+                    <div class="progress-container">
+                        <span class="time-display" id="currentTime">00:00</span>
+                        <input type="range" id="progressBar" value="0" min="0" max="100" step="0.01" disabled>
+                        <span class="time-display" id="totalTime">00:00</span>
+                    </div>
+                    <div style="margin-top:8px;display:flex;align-items:center;gap:10px;">
+                        <span style="font-size:11px;color:#64748b;">🔊</span>
+                        <input type="range" id="volumeBar" value="100" min="0" max="100" style="flex:1;">
+                        <span id="volDisplay" style="font-size:11px;color:#64748b;min-width:28px;text-align:right;">100%</span>
+                    </div>
+                </div>
+
+                <!-- 速度 -->
+                <div class="control-group" style="margin:0 0 10px 0;">
+                    <label>⏱ 播放速度</label>
+                    <div class="btn-row">
+                        <button class="speed-btn" onclick="setSpeed(0.5)">0.5x</button>
+                        <button class="speed-btn active" onclick="setSpeed(1)">1x</button>
+                        <button class="speed-btn" onclick="setSpeed(1.25)">1.25x</button>
+                        <button class="speed-btn" onclick="setSpeed(1.5)">1.5x</button>
+                        <button class="speed-btn" onclick="setSpeed(2)">2x</button>
+                    </div>
+                </div>
+
+                <!-- 段落跳转 -->
+                <div class="control-group" style="margin:0 0 10px 0;">
+                    <label>📑 段落跳转</label>
+                    <input type="text" class="search-box" id="searchBox" placeholder="搜索文本内容..." oninput="onSearch()">
+                    <div class="nav-btns" style="margin-top:10px;">
+                        <button onclick="prevSegment()">⬆ 上一段</button>
+                        <button onclick="nextSegment()">⬇ 下一段</button>
+                    </div>
+                    <div style="margin-top:8px;font-size:12px;color:#64748b;">
+                        共 <span id="segCount">0</span> 段 | 当前 <span id="currentSeg">0</span>
+                    </div>
+                </div>
+
+                <!-- 云端同步 -->
+                <div class="control-group" style="margin:0 0 10px 0;">
+                    <label>☁️ 云端同步</label>
+                    <div style="display:flex;gap:6px;margin-bottom:8px;">
+                        <input type="text" class="search-box" id="syncCodeInput" placeholder="输入同步码..." style="flex:1;font-size:12px;padding:6px 10px;">
+                        <button onclick="loadCloudProgress()" style="padding:6px 12px;font-size:12px;" class="primary">📥 拉取</button>
+                    </div>
+                    <div style="display:flex;gap:6px;">
+                        <button onclick="saveCloudProgress()" style="flex:1;font-size:12px;padding:6px 8px;">📤 保存到云端</button>
+                        <button onclick="generateSyncCode()" style="flex:1;font-size:12px;padding:6px 8px;">🔑 新生成同步码</button>
+                    </div>
+                    <div id="syncStatus" style="margin-top:6px;font-size:11px;color:#64748b;"></div>
+                </div>
+
+                <!-- 进度管理 -->
+                <div class="control-group" style="margin:0 0 10px 0;">
+                    <label>💾 本地进度</label>
+                    <button onclick="clearAllProgress(); alert('已清除所有保存的进度');" style="font-size:12px;padding:6px 10px;width:100%;">
+                        🗑️ 清除本地进度
+                    </button>
+                    <div style="margin-top:6px;font-size:11px;color:#475569;">
+                        自动保存到浏览器，换设备请使用云端同步
+                    </div>
+                </div>
+
+                <!-- 快捷键 -->
+                <div class="control-group" style="margin:0;">
+                    <label>⌨ 快捷键</label>
+                    <div class="shortcut-list">
+                        <kbd>Space</kbd> 播放/暂停<br>
+                        <kbd>←</kbd> <kbd>→</kbd> 快退/快进 5秒<br>
+                        <kbd>↑</kbd> <kbd>↓</kbd> 上/下一段<br>
+                        <kbd>F</kbd> 聚焦搜索
+                    </div>
+                </div>
+            </div>
+
+            <!-- 底部滚动区：只有文件上传 -->
+            <div class="sidebar-scroll">
+                <div class="control-group">
+                    <label>📁 文件选择</label>
+
+                    <div class="file-drop-zone" id="dropZoneAudio">
+                        <input type="file" id="audioFileInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*">
+                        <div class="icon">🎵</div>
+                        <div class="title" id="audioLabel">选择音频文件（MP3/WAV）</div>
+                        <div class="subtitle">点击选择 或 拖拽文件到此处</div>
+                    </div>
+                    <div id="audioStatus" class="file-status"></div>
+
+                    <div class="file-drop-zone" id="dropZoneJson">
+                        <input type="file" id="jsonFileInput" accept=".json,application/json">
+                        <div class="icon">📋</div>
+                        <div class="title" id="jsonLabel">选择 segments.json</div>
+                        <div class="subtitle">点击选择 或 拖拽文件到此处</div>
+                    </div>
+                    <div id="jsonStatus" class="file-status"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：文本显示 -->
+        <div class="content" id="contentArea">
+            <div class="empty-state">
+                <div class="icon">📖</div>
+                <h2>欢迎使用有声书播放器</h2>
+                <p>请在左侧面板上传音频文件和 segments.json，即可开始播放</p>
+                <div class="hint">
+                    <strong>使用步骤：</strong><br>
+                    1. 服务器上运行生成脚本，得到 audiobook_complete.mp3 和 segments.json<br>
+                    2. 把这两个文件下载到你的电脑<br>
+                    3. 在本页面选择这两个文件，开始播放<br><br>
+                    <strong>文件格式说明：</strong><br>
+                    • 音频文件：audiobook_complete.mp3（合并后的完整有声书）<br>
+                    • JSON 文件：segments.json（每段文本的时间戳数据）
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部浮动控制栏（滚动时自动显示） -->
+    <div class="bottom-bar" id="bottomBar">
+        <div class="bottom-inner">
+            <button onclick="togglePlay()" id="bottomPlay" class="bottom-play" disabled>▶</button>
+            <div class="bottom-progress">
+                <span id="bottomCur" style="font-size:11px;color:#94a3b8;min-width:36px;text-align:right;">00:00</span>
+                <input type="range" id="bottomProgress" value="0" min="0" max="100" step="0.01" disabled>
+                <span id="bottomTot" style="font-size:11px;color:#64748b;min-width:36px;">00:00</span>
+            </div>
+            <div class="bottom-speeds">
+                <button class="bottom-spd" onclick="setSpeed(0.5)">0.5x</button>
+                <button class="bottom-spd" onclick="setSpeed(1)">1x</button>
+                <button class="bottom-spd" onclick="setSpeed(1.25)">1.25x</button>
+                <button class="bottom-spd" onclick="setSpeed(1.5)">1.5x</button>
+                <button class="bottom-spd" onclick="setSpeed(2)">2x</button>
+            </div>
+            <button onclick="seek(-5)" style="font-size:13px;padding:4px 8px;background:#334155;">⏪</button>
+            <button onclick="seek(5)" style="font-size:13px;padding:4px 8px;background:#334155;">⏩</button>
+        </div>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <div class="status-bar" style="padding-bottom: 56px;">
+        <span id="statusText">等待选择文件...</span>
+    </div>
+
+    <!-- ========== 悬浮窗 ========== -->
+    <div class="float-window" id="floatWindow" style="right: 24px; bottom: 80px;">
+        <!-- 收起状态：小圆球 -->
+        <div class="float-ball" id="floatBall" onclick="expandFloat()" title="点击展开控制面板">
+            ▶
+        </div>
+
+        <!-- 展开状态：控制面板 -->
+        <div class="float-panel" id="floatPanel">
+            <!-- 标题栏（可拖动） -->
+            <div class="float-header" id="floatHeader">
+                <div class="float-header-title">
+                    🎵 <span id="floatTitle">迷你控制器</span>
+                </div>
+                <div class="float-header-btns">
+                    <div class="float-header-btn" onclick="minimizeFloat()" title="最小化">─</div>
+                    <div class="float-header-btn" onclick="closeFloat()" title="关闭">✕</div>
+                </div>
+            </div>
+
+            <!-- 内容区 -->
+            <div class="float-body">
+                <!-- 当前段落预览 -->
+                <div class="float-segment-preview" id="floatPreview">
+                    <div class="seg-label">#0000</div>
+                    <div>请选择音频文件和 segments.json 开始播放</div>
+                </div>
+
+                <!-- 迷你进度条 -->
+                <div class="float-progress">
+                    <span class="time" id="floatCurrent">00:00</span>
+                    <input type="range" id="floatProgress" value="0" min="0" max="100" step="0.01">
+                    <span class="time" id="floatTotal">00:00</span>
+                </div>
+
+                <!-- 播放控制 -->
+                <div class="float-controls">
+                    <button class="float-btn nav" id="floatPrev" onclick="prevSegment()" title="上一段">⬆</button>
+                    <button class="float-btn nav" onclick="seek(-5)" title="快退5秒">⏪</button>
+                    <button class="float-btn play" id="floatPlay" onclick="togglePlay()" title="播放/暂停">▶</button>
+                    <button class="float-btn nav" onclick="seek(5)" title="快进5秒">⏩</button>
+                    <button class="float-btn nav" id="floatNext" onclick="nextSegment()" title="下一段">⬇</button>
+                </div>
+
+                <!-- 速度 -->
+                <div class="float-speeds">
+                    <button class="float-speed-btn" onclick="setSpeed(0.5)">0.5x</button>
+                    <button class="float-speed-btn active" onclick="setSpeed(1)">1x</button>
+                    <button class="float-speed-btn" onclick="setSpeed(1.25)">1.25x</button>
+                    <button class="float-speed-btn" onclick="setSpeed(1.5)">1.5x</button>
+                    <button class="float-speed-btn" onclick="setSpeed(2)">2x</button>
+                </div>
+
+                <!-- 画中画 -->
+                <button class="pip-btn" id="pipBtn" onclick="togglePictureInPicture()" title="打开画中画（可在其他标签页控制）">
+                    🖥️ 画中画模式
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ==================== 全局状态 ====================
+    let audio = null;
+    let segments = [];
+    let currentSegmentIdx = -1;
+    let isReady = false;
+    let playbackRate = 1.0;
+    let filteredSegments = null;
+    let searchKeyword = '';
+
+    // ==================== 悬浮窗状态 ====================
+    let floatExpanded = false;
+    let floatVisible = true;
+    let floatDragging = false;
+    let floatDragOffset = { x: 0, y: 0 };
+    let floatPosition = { x: 0, y: 0 };
+
+    // ==================== 画中画状态 ====================
+    let pipWindow = null;
+    let pipActive = false;
+    const pipSupported = 'documentPictureInPicture' in window || 'requestPictureInPicture' in HTMLVideoElement.prototype;
+
+    // ==================== 文件上传处理 ====================
+    const audioFileInput = document.getElementById('audioFileInput');
+    const jsonFileInput = document.getElementById('jsonFileInput');
+    const dropZoneAudio = document.getElementById('dropZoneAudio');
+    const dropZoneJson = document.getElementById('dropZoneJson');
+
+    // 点击选择
+    audioFileInput.addEventListener('change', (e) => handleAudioFile(e.target.files[0]));
+    jsonFileInput.addEventListener('change', (e) => handleJsonFile(e.target.files[0]));
+
+    // 拖拽支持
+    function setupDrop(zone, input, handler) {
+        zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+        zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+        zone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) handler(file);
+        });
+    }
+    setupDrop(dropZoneAudio, audioFileInput, handleAudioFile);
+    setupDrop(dropZoneJson, jsonFileInput, handleJsonFile);
+
+    function handleAudioFile(file) {
+        if (!file) return;
+        if (!file.type.startsWith('audio/') && !file.name.endsWith('.mp3') && !file.name.endsWith('.wav')) {
+            alert('请选择音频文件（MP3 或 WAV）');
+            return;
+        }
+
+        // 释放旧的 URL
+        if (audio && audio.src && audio.src.startsWith('blob:')) {
+            URL.revokeObjectURL(audio.src);
+        }
+
+        const url = URL.createObjectURL(file);
+        audio = new Audio(url);
+        audio.playbackRate = playbackRate;
+        setupAudioEvents();
+
+        document.getElementById('audioLabel').textContent = file.name;
+        audioFileName = file.name;  // 记录文件名用于进度恢复匹配
+        const status = document.getElementById('audioStatus');
+        status.textContent = `✅ 已加载: ${(file.size / 1024 / 1024).toFixed(1)} MB`;
+        status.className = 'file-status ok';
+
+        // 显示悬浮窗
+        showFloat();
+
+        checkReady();
+    }
+
+    function handleJsonFile(file) {
+        if (!file) return;
+        if (!file.name.endsWith('.json')) {
+            alert('请选择 .json 文件');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                segments = JSON.parse(e.target.result);
+                if (!Array.isArray(segments) || segments.length === 0) {
+                    throw new Error('segments.json 格式不正确或为空');
+                }
+                // 确保每个段都有必要的字段
+                segments.forEach((seg, i) => {
+                    if (typeof seg.start !== 'number') seg.start = 0;
+                    if (typeof seg.end !== 'number') {
+                        // 如果没有 end，尝试用下一段的 start 或估算
+                        seg.end = segments[i + 1] ? segments[i + 1].start : seg.start + 5;
+                    }
+                    if (!seg.text) seg.text = `(第 ${i + 1} 段)`;
+                });
+
+                document.getElementById('jsonLabel').textContent = file.name;
+                jsonFileName = file.name;  // 记录文件名用于进度恢复匹配
+                const status = document.getElementById('jsonStatus');
+                status.textContent = `✅ 已加载: ${segments.length} 段文本`;
+                status.className = 'file-status ok';
+
+                renderSegments();
+
+                // 显示悬浮窗
+                showFloat();
+
+                checkReady();
+            } catch (err) {
+                alert('解析 JSON 失败: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function checkReady() {
+        if (audio && segments.length > 0) {
+            isReady = true;
+            document.getElementById('playBtn').disabled = false;
+            document.getElementById('progressBar').disabled = false;
+            document.getElementById('floatPlay').disabled = false;
+            document.getElementById('floatPrev').disabled = false;
+            document.getElementById('floatNext').disabled = false;
+            document.getElementById('pipBtn').disabled = !pipSupported;
+            document.getElementById('bottomPlay').disabled = false;
+            document.getElementById('bottomProgress').disabled = false;
+            document.getElementById('segCount').textContent = segments.length;
+
+            const totalDuration = segments[segments.length - 1].end;
+            const mins = (totalDuration / 60).toFixed(1);
+            document.getElementById('fileInfo').textContent =
+                `共 ${segments.length} 段 | 总时长 ${formatTime(totalDuration)} (${mins} 分钟)`;
+            document.getElementById('statusText').textContent = '✅ 准备就绪，点击播放开始';
+            document.getElementById('totalTime').textContent = formatTime(totalDuration);
+            document.getElementById('floatTotal').textContent = formatTime(totalDuration);
+
+            // 显示头部控制器按钮
+            document.getElementById('toggleFloatBtn').style.display = 'block';
+
+            // 尝试恢复上次进度 + 启动自动保存
+            tryRestoreProgress();
+            startAutoSave();
+            // 初始化云端同步
+            initSupabase();
+            startCloudAutoSave();
+        }
+    }
+
+    // ==================== 音频事件 ====================
+    function setupAudioEvents() {
+        audio.addEventListener('timeupdate', onTimeUpdate);
+        audio.addEventListener('loadedmetadata', () => {
+            if (audio.duration && isFinite(audio.duration)) {
+                document.getElementById('totalTime').textContent = formatTime(audio.duration);
+                document.getElementById('floatTotal').textContent = formatTime(audio.duration);
+            }
+        });
+        audio.addEventListener('ended', () => {
+            document.getElementById('playBtn').textContent = '▶ 播放';
+            document.getElementById('floatPlay').textContent = '▶';
+            document.getElementById('floatBall').textContent = '▶';
+            document.getElementById('floatBall').classList.remove('playing');
+            document.getElementById('statusText').textContent = '播放完成';
+            clearAllProgress();
+            stopAutoSave();
+        });
+
+        // 进度条拖动（主面板）
+        const progressBar = document.getElementById('progressBar');
+        progressBar.addEventListener('input', (e) => {
+            if (audio && audio.duration) {
+                audio.currentTime = (e.target.value / 100) * audio.duration;
+            }
+        });
+
+        // 迷你进度条拖动（悬浮窗）
+        const floatProgress = document.getElementById('floatProgress');
+        floatProgress.addEventListener('input', (e) => {
+            if (audio && audio.duration) {
+                audio.currentTime = (e.target.value / 100) * audio.duration;
+            }
+        });
+
+        // 音量
+        const volumeBar = document.getElementById('volumeBar');
+        volumeBar.addEventListener('input', (e) => {
+            const vol = e.target.value / 100;
+            audio.volume = vol;
+            document.getElementById('volDisplay').textContent = e.target.value + '%';
+        });
+    }
+
+    // ==================== 播放控制 ====================
+    function togglePlay() {
+        if (!audio) return;
+        if (audio.paused) {
+            audio.play();
+            document.getElementById('playBtn').textContent = '⏸ 暂停';
+            document.getElementById('floatPlay').textContent = '⏸';
+            document.getElementById('floatBall').textContent = '⏸';
+            document.getElementById('floatBall').classList.add('playing');
+            document.getElementById('statusText').textContent = '▶ 播放中...';
+            startAutoSave();
+        } else {
+            audio.pause();
+            document.getElementById('playBtn').textContent = '▶ 播放';
+            document.getElementById('floatPlay').textContent = '▶';
+            document.getElementById('floatBall').textContent = '▶';
+            document.getElementById('floatBall').classList.remove('playing');
+            document.getElementById('statusText').textContent = '⏸ 已暂停';
+            saveProgress(); // 暂停时立即保存
+        }
+        // 同步画中画窗口
+        updatePipWindow();
+
+        // 同步底部浮动栏
+        updateBottomBar();
+    }
+
+    function seek(seconds) {
+        if (!audio) return;
+        audio.currentTime = Math.max(0, Math.min(audio.duration || Infinity, audio.currentTime + seconds));
+    }
+
+    function setSpeed(rate) {
+        playbackRate = rate;
+        if (audio) audio.playbackRate = rate;
+        // 同步主面板速度按钮
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.classList.toggle('active', parseFloat(btn.textContent) === rate);
+        });
+        // 同步悬浮窗速度按钮
+        document.querySelectorAll('.float-speed-btn').forEach(btn => {
+            btn.classList.toggle('active', parseFloat(btn.textContent) === rate);
+        });
+        // 同步底部浮动栏速度按钮
+        document.querySelectorAll('.bottom-spd').forEach(btn => {
+            btn.classList.toggle('active', parseFloat(btn.textContent) === rate);
+        });
+    }
+
+    // ==================== 段落跳转 ====================
+    function jumpToSegment(idx) {
+        if (!audio || idx < 0 || idx >= segments.length) return;
+        audio.currentTime = segments[idx].start;
+        if (audio.paused) {
+            audio.play();
+            document.getElementById('playBtn').textContent = '⏸ 暂停';
+            document.getElementById('floatPlay').textContent = '⏸';
+            document.getElementById('floatBall').textContent = '⏸';
+            document.getElementById('floatBall').classList.add('playing');
+        }
+    }
+
+    function prevSegment() {
+        if (currentSegmentIdx > 0) jumpToSegment(currentSegmentIdx - 1);
+    }
+
+    function nextSegment() {
+        if (currentSegmentIdx < segments.length - 1) jumpToSegment(currentSegmentIdx + 1);
+    }
+
+    // ==================== 时间同步 ====================
+    function onTimeUpdate() {
+        if (!audio) return;
+        const t = audio.currentTime;
+
+        // 更新主面板进度条
+        const progressBar = document.getElementById('progressBar');
+        if (audio.duration && isFinite(audio.duration)) {
+            const pct = (t / audio.duration) * 100;
+            progressBar.value = pct;
+            document.getElementById('totalTime').textContent = formatTime(audio.duration);
+
+            // 同步悬浮窗进度条
+            document.getElementById('floatProgress').value = pct;
+        }
+        document.getElementById('currentTime').textContent = formatTime(t);
+
+        // 同步悬浮窗时间
+        document.getElementById('floatCurrent').textContent = formatTime(t);
+
+        // 找到当前段落
+        const segs = filteredSegments || segments;
+        let foundIdx = -1;
+        for (let i = 0; i < segs.length; i++) {
+            const seg = segs[i];
+            if (t >= seg.start && t < seg.end) {
+                foundIdx = i;
+                break;
+            }
+        }
+        if (foundIdx === -1 && segs.length > 0 && t >= segs[segs.length - 1].end) {
+            foundIdx = segs.length - 1;
+        }
+
+        if (foundIdx !== currentSegmentIdx && foundIdx !== -1) {
+            currentSegmentIdx = foundIdx;
+            highlightSegment(foundIdx);
+        }
+
+        // 更新悬浮窗预览文本
+        updateFloatPreview(foundIdx);
+
+        // 同步画中画窗口
+        updatePipWindow();
+
+        // 同步底部浮动栏
+        updateBottomBar();
+
+        // 定期保存进度
+        if (isReady && currentSegmentIdx % 5 === 0) {
+            saveProgress();
+        }
+
+        document.getElementById('currentSeg').textContent =
+            foundIdx >= 0 ? `${foundIdx + 1} / ${segments.length}` : '0';
+    }
+
+    function highlightSegment(idx) {
+        document.querySelectorAll('.segment.active').forEach(el => el.classList.remove('active'));
+        const seg = (filteredSegments || segments)[idx];
+        if (!seg) return;
+        const el = document.querySelector(`.segment[data-idx="${seg.idx}"]`);
+        if (el) {
+            el.classList.add('active');
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    // ==================== 悬浮窗预览更新 ====================
+    function updateFloatPreview(idx) {
+        if (idx < 0 || idx >= segments.length) return;
+        const seg = segments[idx];
+        const preview = document.getElementById('floatPreview');
+        const label = String(idx + 1).padStart(4, '0');
+        const timeStr = formatTime(seg.start);
+        preview.innerHTML = `
+            <div class="seg-label">#${label} &nbsp; ${timeStr}</div>
+            <div>${escapeHtml(seg.text)}</div>
+        `;
+    }
+
+    // ==================== 画中画(Picture-in-Picture) ====================
+    async function togglePictureInPicture() {
+        // 方式1: Document Picture-in-Picture API (Chrome 116+, 推荐)
+        if ('documentPictureInPicture' in window) {
+            if (pipWindow) {
+                pipWindow.close();
+                pipWindow = null;
+                pipActive = false;
+                document.getElementById('pipBtn').classList.remove('active');
+                document.getElementById('pipBtn').textContent = '🖥️ 画中画模式';
+                return;
+            }
+            try {
+                pipWindow = await documentPictureInPicture.requestWindow({
+                    width: 340,
+                    height: 260,
+                });
+                pipActive = true;
+                document.getElementById('pipBtn').classList.add('active');
+                document.getElementById('pipBtn').textContent = '🖥️ 关闭画中画';
+
+                buildPipContent(pipWindow);
+
+                // PiP窗口关闭时清理
+                pipWindow.addEventListener('pagehide', () => {
+                    pipWindow = null;
+                    pipActive = false;
+                    if (document.getElementById('pipBtn')) {
+                        document.getElementById('pipBtn').classList.remove('active');
+                        document.getElementById('pipBtn').textContent = '🖥️ 画中画模式';
+                    }
+                });
+
+            } catch (err) {
+                console.error('画中画启动失败:', err);
+                alert('画中画启动失败: ' + err.message);
+            }
+        }
+        // 方式2: Video Picture-in-Picture (兼容性更好，但需video元素)
+        else {
+            alert('您的浏览器不支持文档画中画功能。\n\n推荐方案：\n1. 使用 Chrome 116+ 或 Edge 116+\n2. 使用方案B：把播放器用独立小窗口打开（见使用说明）');
+        }
+    }
+
+    function buildPipContent(pipWin) {
+        const doc = pipWin.document;
+        doc.head.innerHTML = `
+            <meta charset="UTF-8">
+            <title>有声书控制器</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                    background: #0f172a;
+                    color: #e2e8f0;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    padding: 14px 16px;
+                    min-width: 280px;
+                    user-select: none;
+                }
+                .pip-title {
+                    font-size: 12px;
+                    color: #fbbf24;
+                    font-weight: 600;
+                    margin-bottom: 8px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .pip-text {
+                    font-size: 13px;
+                    line-height: 1.7;
+                    color: #cbd5e1;
+                    margin-bottom: 10px;
+                    max-height: 120px;
+                    overflow-y: auto;
+                    position: relative;
+                    padding-right: 4px;
+                }
+                .pip-text::-webkit-scrollbar { width: 3px; }
+                .pip-text::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+                .pip-seg-label { font-size: 10px; color: #64748b; margin-bottom: 2px; }
+                .pip-progress {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    margin-bottom: 10px;
+                }
+                .pip-progress input[type="range"] {
+                    flex: 1;
+                    -webkit-appearance: none;
+                    height: 4px;
+                    background: #334155;
+                    border-radius: 3px;
+                    outline: none;
+                    cursor: pointer;
+                }
+                .pip-progress input[type="range"]::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    width: 12px; height: 12px;
+                    background: #fbbf24;
+                    border-radius: 50%;
+                    cursor: pointer;
+                }
+                .pip-time { font-size: 10px; color: #64748b; min-width: 32px; text-align: center; }
+                .pip-controls {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                }
+                .pip-btn {
+                    width: 34px; height: 34px;
+                    border-radius: 10px;
+                    background: #334155;
+                    color: #e2e8f0;
+                    border: none;
+                    cursor: pointer;
+                    font-size: 14px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .pip-btn:hover { background: #475569; }
+                .pip-btn.play {
+                    width: 40px; height: 40px;
+                    font-size: 18px;
+                    background: #fbbf24;
+                    color: #0f172a;
+                }
+                .pip-btn.play:hover { background: #f59e0b; }
+                .pip-speeds {
+                    display: flex;
+                    justify-content: center;
+                    gap: 4px;
+                    margin-top: 10px;
+                }
+                .pip-speed-btn {
+                    padding: 2px 8px;
+                    font-size: 10px;
+                    border-radius: 5px;
+                    background: rgba(51, 65, 85, 0.4);
+                    color: #64748b;
+                    border: none;
+                    cursor: pointer;
+                }
+                .pip-speed-btn.active { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+                .pip-opacity {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    margin-top: 10px;
+                    padding-top: 8px;
+                    border-top: 1px solid rgba(51, 65, 85, 0.5);
+                }
+                .pip-opacity label { font-size: 10px; color: #64748b; white-space: nowrap; }
+                .pip-opacity input[type="range"] {
+                    flex: 1;
+                    -webkit-appearance: none;
+                    height: 4px;
+                    background: #334155;
+                    border-radius: 3px;
+                    outline: none;
+                    cursor: pointer;
+                }
+                .pip-opacity input[type="range"]::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    width: 12px; height: 12px;
+                    background: #fbbf24;
+                    border-radius: 50%;
+                    cursor: pointer;
+                }
+                .pip-opacity .val { font-size: 10px; color: #64748b; min-width: 28px; text-align: right; }
+            </style>
+        `;
+        doc.body.innerHTML = `
+            <div class="pip-title" id="pipWTitle">📖 有声书播放器</div>
+            <div class="pip-text" id="pipWText">
+                <div class="pip-seg-label">#0000</div>
+                <div>准备就绪</div>
+            </div>
+            <div class="pip-progress">
+                <span class="pip-time" id="pipWCur">00:00</span>
+                <input type="range" id="pipWProgress" value="0" min="0" max="100" step="0.01">
+                <span class="pip-time" id="pipWTotal">00:00</span>
+            </div>
+            <div class="pip-controls">
+                <button class="pip-btn" onclick="window.opener?.postMessage?.({action:'prev'},'*')" title="上一段">⬆</button>
+                <button class="pip-btn" onclick="window.opener?.postMessage?.({action:'seekBack'},'*')" title="快退5秒">⏪</button>
+                <button class="pip-btn play" id="pipWPlay" onclick="window.opener?.postMessage?.({action:'togglePlay'},'*')" title="播放/暂停">▶</button>
+                <button class="pip-btn" onclick="window.opener?.postMessage?.({action:'seekForward'},'*')" title="快进5秒">⏩</button>
+                <button class="pip-btn" onclick="window.opener?.postMessage?.({action:'next'},'*')" title="下一段">⬇</button>
+            </div>
+            <div class="pip-speeds">
+                <button class="pip-speed-btn" onclick="window.opener?.postMessage?.({action:'speed',rate:0.5},'*')">0.5x</button>
+                <button class="pip-speed-btn" onclick="window.opener?.postMessage?.({action:'speed',rate:1},'*')">1x</button>
+                <button class="pip-speed-btn" onclick="window.opener?.postMessage?.({action:'speed',rate:1.25},'*')">1.25x</button>
+                <button class="pip-speed-btn" onclick="window.opener?.postMessage?.({action:'speed',rate:1.5},'*')">1.5x</button>
+                <button class="pip-speed-btn" onclick="window.opener?.postMessage?.({action:'speed',rate:2},'*')">2x</button>
+            </div>
+            <div class="pip-opacity">
+                <label>👁 透明</label>
+                <input type="range" id="pipWOpacity" value="100" min="20" max="100" step="1">
+                <span class="val" id="pipWOpVal">100%</span>
+            </div>
+        `;
+
+        // 进度条拖动
+        doc.getElementById('pipWProgress').addEventListener('input', (e) => {
+            window.opener?.postMessage?.({action:'seekTo', percent: parseFloat(e.target.value)}, '*');
+        });
+
+        // 透明度调节
+        const opSlider = doc.getElementById('pipWOpacity');
+        const opVal = doc.getElementById('pipWOpVal');
+        opSlider.addEventListener('input', (e) => {
+            const pct = parseInt(e.target.value);
+            opVal.textContent = pct + '%';
+            // 调整 body 背景色透明度
+            const alpha = pct / 100;
+            doc.body.style.background = `rgba(15, 23, 42, ${alpha})`;
+            // 文本渐隐遮罩也同步调整
+            const styleSheet = doc.querySelector('style');
+            if (styleSheet) {
+                const css = styleSheet.textContent;
+                const newCss = css.replace(
+                    /background: linear-gradient\(to bottom, transparent, rgba\(15, 23, 42, [\d.]+\)\)/,
+                    `background: linear-gradient(to bottom, transparent, rgba(15, 23, 42, ${alpha}))`
+                );
+                if (newCss !== css) styleSheet.textContent = newCss;
+            }
+        });
+
+        // 立即更新一次内容
+        updatePipWindow();
+    }
+
+    function updatePipWindow() {
+        if (!pipWindow || !pipWindow.document) return;
+        const doc = pipWindow.document;
+
+        // 更新当前段落文本
+        if (currentSegmentIdx >= 0 && currentSegmentIdx < segments.length) {
+            const seg = segments[currentSegmentIdx];
+            const label = String(currentSegmentIdx + 1).padStart(4, '0');
+            const timeStr = formatTime(seg.start);
+            const textEl = doc.getElementById('pipWText');
+            if (textEl) {
+                textEl.innerHTML = `
+                    <div class="pip-seg-label">#${label} &nbsp; ${timeStr}</div>
+                    <div>${escapeHtml(seg.text)}</div>
+                `;
+            }
+        }
+
+        // 更新时间
+        if (audio) {
+            const curEl = doc.getElementById('pipWCur');
+            const totEl = doc.getElementById('pipWTotal');
+            const progEl = doc.getElementById('pipWProgress');
+            const playBtn = doc.getElementById('pipWPlay');
+
+            if (curEl) curEl.textContent = formatTime(audio.currentTime);
+            if (totEl && audio.duration) totEl.textContent = formatTime(audio.duration);
+            if (progEl && audio.duration) {
+                progEl.value = (audio.currentTime / audio.duration) * 100;
+            }
+            if (playBtn) {
+                playBtn.textContent = audio.paused ? '▶' : '⏸';
+            }
+
+            // 同步速度按钮
+            doc.querySelectorAll('.pip-speed-btn').forEach(btn => {
+                btn.classList.toggle('active', parseFloat(btn.textContent) === playbackRate);
+            });
+        }
+    }
+
+    // 监听画中画窗口的消息
+    window.addEventListener('message', (e) => {
+        if (!e.data || !e.data.action) return;
+        switch (e.data.action) {
+            case 'togglePlay': togglePlay(); break;
+            case 'prev': prevSegment(); break;
+            case 'next': nextSegment(); break;
+            case 'seekBack': seek(-5); break;
+            case 'seekForward': seek(5); break;
+            case 'seekTo':
+                if (audio && audio.duration && e.data.percent !== undefined) {
+                    audio.currentTime = (e.data.percent / 100) * audio.duration;
+                }
+                break;
+            case 'speed':
+                if (e.data.rate) setSpeed(e.data.rate);
+                break;
+        }
+    });
+
+    // ==================== 悬浮窗控制 ====================
+    function expandFloat() {
+        document.getElementById('floatBall').style.display = 'none';
+        document.getElementById('floatPanel').classList.add('open');
+        floatExpanded = true;
+    }
+
+    function minimizeFloat() {
+        document.getElementById('floatPanel').classList.remove('open');
+        document.getElementById('floatBall').style.display = 'flex';
+        floatExpanded = false;
+    }
+
+    function closeFloat() {
+        minimizeFloat();
+    }
+
+    function showFloat() {
+        if (!floatVisible) {
+            document.getElementById('floatBall').style.display = 'flex';
+            floatVisible = true;
+        }
+    }
+
+    function toggleFloatVisibility() {
+        const ball = document.getElementById('floatBall');
+        const panel = document.getElementById('floatPanel');
+        if (ball.style.display === 'none' && !panel.classList.contains('open')) {
+            // 已隐藏，显示小球
+            ball.style.display = 'flex';
+            floatVisible = true;
+        } else if (panel.classList.contains('open')) {
+            // 面板展开中，收起
+            minimizeFloat();
+        } else {
+            // 小球显示中，隐藏
+            ball.style.display = 'none';
+            floatVisible = false;
+        }
+    }
+
+    // ==================== 悬浮窗拖动 ====================
+    const floatWindow = document.getElementById('floatWindow');
+    const floatHeader = document.getElementById('floatHeader');
+    const floatBall = document.getElementById('floatBall');
+
+    // 拖动面板（通过标题栏）
+    floatHeader.addEventListener('mousedown', startDrag);
+
+    // 拖动小球
+    floatBall.addEventListener('mousedown', startDrag);
+
+    function startDrag(e) {
+        floatDragging = true;
+        const rect = floatWindow.getBoundingClientRect();
+        floatDragOffset.x = e.clientX - rect.left;
+        floatDragOffset.y = e.clientY - rect.top;
+        floatWindow.style.transition = 'none';
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', stopDrag);
+    }
+
+    function onDrag(e) {
+        if (!floatDragging) return;
+        e.preventDefault();
+        let x = e.clientX - floatDragOffset.x;
+        let y = e.clientY - floatDragOffset.y;
+
+        // 限制在视口内
+        const maxX = window.innerWidth - floatWindow.offsetWidth;
+        const maxY = window.innerHeight - floatWindow.offsetHeight;
+        x = Math.max(0, Math.min(x, maxX));
+        y = Math.max(0, Math.min(y, maxY));
+
+        floatWindow.style.left = x + 'px';
+        floatWindow.style.top = y + 'px';
+        floatWindow.style.right = 'auto';
+        floatWindow.style.bottom = 'auto';
+    }
+
+    function stopDrag() {
+        floatDragging = false;
+        floatWindow.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+        document.removeEventListener('mousemove', onDrag);
+        document.removeEventListener('mouseup', stopDrag);
+    }
+
+    // 触摸设备支持
+    floatHeader.addEventListener('touchstart', startTouchDrag);
+    floatBall.addEventListener('touchstart', startTouchDrag);
+
+    function startTouchDrag(e) {
+        floatDragging = true;
+        const touch = e.touches[0];
+        const rect = floatWindow.getBoundingClientRect();
+        floatDragOffset.x = touch.clientX - rect.left;
+        floatDragOffset.y = touch.clientY - rect.top;
+        floatWindow.style.transition = 'none';
+        document.addEventListener('touchmove', onTouchDrag, { passive: false });
+        document.addEventListener('touchend', stopTouchDrag);
+    }
+
+    function onTouchDrag(e) {
+        if (!floatDragging) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        let x = touch.clientX - floatDragOffset.x;
+        let y = touch.clientY - floatDragOffset.y;
+
+        const maxX = window.innerWidth - floatWindow.offsetWidth;
+        const maxY = window.innerHeight - floatWindow.offsetHeight;
+        x = Math.max(0, Math.min(x, maxX));
+        y = Math.max(0, Math.min(y, maxY));
+
+        floatWindow.style.left = x + 'px';
+        floatWindow.style.top = y + 'px';
+        floatWindow.style.right = 'auto';
+        floatWindow.style.bottom = 'auto';
+    }
+
+    function stopTouchDrag() {
+        floatDragging = false;
+        floatWindow.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+        document.removeEventListener('touchmove', onTouchDrag);
+        document.removeEventListener('touchend', stopTouchDrag);
+    }
+
+    // ==================== 渲染 ====================
+    function renderSegments() {
+        const segs = filteredSegments || segments;
+        const content = document.getElementById('contentArea');
+        if (segs.length === 0) {
+            content.innerHTML = '<div class="empty-state"><h2>没有找到匹配的段落</h2></div>';
+            return;
+        }
+
+        content.innerHTML = `
+            <div class="segment-list fade-in" id="segmentList">
+                ${segs.map((seg) => `
+                    <div class="segment" data-idx="${seg.idx}" onclick="jumpToSegment(${segments.indexOf(segments.find(s => s.idx === seg.idx))})">
+                        <div class="seg-index">#${String(seg.idx + 1).padStart(4, '0')} &nbsp; ${formatTime(seg.start)}</div>
+                        <div>${escapeHtml(seg.text)}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    // ==================== 搜索 ====================
+    function onSearch() {
+        const kw = document.getElementById('searchBox').value.trim();
+        searchKeyword = kw;
+        if (!kw) {
+            filteredSegments = null;
+        } else {
+            filteredSegments = segments.filter(s => s.text.includes(kw));
+        }
+        renderSegments();
+    }
+
+    // ==================== Supabase 云端同步配置 ====================
+    const SUPABASE_URL = 'https://xvzhrfkotaycfpkkqpdp.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_OEpqohLMq7P0Xh4xkSlOEg_UlkbzcWs';
+
+    let supabase = null;
+    let syncCode = localStorage.getItem('audiobook_sync_code') || '';
+
+    // 初始化 Supabase 客户端
+    function initSupabase() {
+        if (SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_KEY === 'YOUR_SUPABASE_ANON_KEY') {
+            console.log('Supabase 未配置，跳过云端同步');
+            document.getElementById('syncStatus').textContent = '⚠️ 请先配置 Supabase（见部署指南）';
+            return false;
+        }
+        try {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            if (syncCode) {
+                document.getElementById('syncCodeInput').value = syncCode;
+                document.getElementById('syncStatus').textContent = `✅ 已配置，同步码: ${syncCode}`;
+            } else {
+                document.getElementById('syncStatus').textContent = '✅ 已配置，请输入或生成同步码';
+            }
+            return true;
+        } catch (e) {
+            console.error('Supabase 初始化失败:', e);
+            document.getElementById('syncStatus').textContent = '❌ 配置错误，请检查 URL 和 Key';
+            return false;
+        }
+    }
+
+    // 生成随机同步码
+    function generateSyncCode() {
+        const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+        syncCode = code;
+        localStorage.setItem('audiobook_sync_code', syncCode);
+        document.getElementById('syncCodeInput').value = syncCode;
+        document.getElementById('syncStatus').textContent = `🔑 新同步码: ${syncCode}（请牢记）`;
+        // 立即保存当前进度
+        saveCloudProgress();
+    }
+
+    // 保存进度到云端
+    async function saveCloudProgress() {
+        if (!supabase) { initSupabase(); }
+        if (!supabase) return;
+        const code = document.getElementById('syncCodeInput').value.trim().toUpperCase();
+        if (!code) {
+            document.getElementById('syncStatus').textContent = '⚠️ 请先输入同步码或生成一个';
+            return;
+        }
+        if (!audio || !segments.length) {
+            document.getElementById('syncStatus').textContent = '⚠️ 请先加载音频';
+            return;
+        }
+
+        syncCode = code;
+        localStorage.setItem('audiobook_sync_code', syncCode);
+
+        const bookName = audioFileName || 'unknown';
+        const data = {
+            sync_code: code,
+            book_name: bookName,
+            current_time: audio.currentTime,
+            current_seg_idx: currentSegmentIdx,
+            playback_rate: playbackRate,
+            updated_at: new Date().toISOString()
+        };
+
+        try {
+            const { error } = await supabase
+                .from('audiobook_progress')
+                .upsert(data, { onConflict: 'sync_code' });
+
+            if (error) throw error;
+            document.getElementById('syncStatus').textContent = `✅ 已保存 (${formatTime(audio.currentTime)} 第${currentSegmentIdx+1}段)`;
+        } catch (e) {
+            document.getElementById('syncStatus').textContent = '❌ 保存失败: ' + e.message;
+        }
+    }
+
+    // 从云端拉取进度
+    async function loadCloudProgress() {
+        if (!supabase) { initSupabase(); }
+        if (!supabase) return;
+        const code = document.getElementById('syncCodeInput').value.trim().toUpperCase();
+        if (!code) {
+            document.getElementById('syncStatus').textContent = '⚠️ 请输入同步码';
+            return;
+        }
+
+        try {
+            const { data, error } = await supabase
+                .from('audiobook_progress')
+                .select('*')
+                .eq('sync_code', code)
+                .single();
+
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    document.getElementById('syncStatus').textContent = '⚠️ 同步码不存在';
+                } else {
+                    throw error;
+                }
+                return;
+            }
+
+            // 应用进度
+            if (data && audio) {
+                audio.currentTime = data.current_time || 0;
+                setSpeed(data.playback_rate || 1);
+                syncCode = code;
+                localStorage.setItem('audiobook_sync_code', syncCode);
+                document.getElementById('syncCodeInput').value = syncCode;
+                document.getElementById('syncStatus').textContent =
+                    `✅ 已同步: ${formatTime(data.current_time)} (第${(data.current_seg_idx||0)+1}段)`;
+
+                // 如果音频在播放，继续播放；否则准备就绪
+                if (audio.paused) {
+                    audio.play().catch(()=>{});
+                }
+            }
+        } catch (e) {
+            document.getElementById('syncStatus').textContent = '❌ 拉取失败: ' + e.message;
+        }
+    }
+
+    // 定期自动保存到云端（每30秒）
+    let cloudSaveInterval = null;
+    function startCloudAutoSave() {
+        if (cloudSaveInterval) clearInterval(cloudSaveInterval);
+        cloudSaveInterval = setInterval(() => {
+            if (isReady && syncCode) saveCloudProgress();
+        }, 30000);
+    }
+
+    // ==================== 进度保存/恢复（localStorage）====================
+    const LS_KEY = 'audiobook_progress';
+    let audioFileName = '';
+    let jsonFileName = '';
+    let saveInterval = null;
+
+    // 保存当前进度到 localStorage
+    function saveProgress() {
+        if (!audio || !segments.length || !audioFileName) return;
+        const data = {
+            audioFile: audioFileName,
+            jsonFile: jsonFileName,
+            currentTime: audio.currentTime,
+            currentSegIdx: currentSegmentIdx,
+            playbackRate: playbackRate,
+            savedAt: Date.now()
+        };
+        try {
+            localStorage.setItem(LS_KEY, JSON.stringify(data));
+        } catch (e) {
+            // localStorage 满了则忽略
+        }
+    }
+
+    // 启动自动保存（每 5 秒）
+    function startAutoSave() {
+        if (saveInterval) clearInterval(saveInterval);
+        saveInterval = setInterval(saveProgress, 5000);
+    }
+
+    // 停止自动保存
+    function stopAutoSave() {
+        if (saveInterval) {
+            clearInterval(saveInterval);
+            saveInterval = null;
+        }
+    }
+
+    // 恢复上次进度
+    function tryRestoreProgress() {
+        try {
+            const raw = localStorage.getItem(LS_KEY);
+            if (!raw) return false;
+            const data = JSON.parse(raw);
+            if (!data || !data.audioFile) return false;
+
+            // 检查是否是同一套文件（用文件名匹配）
+            if (data.audioFile !== audioFileName) return false;
+
+            // 显示恢复提示
+            const elapsed = data.savedAt ? Math.floor((Date.now() - data.savedAt) / 60000) : 0;
+            const timeStr = formatTime(data.currentTime);
+            const segNum = data.currentSegIdx >= 0 ? data.currentSegIdx + 1 : 0;
+
+            const content = document.getElementById('contentArea');
+            const restoreEl = document.createElement('div');
+            restoreEl.id = 'restorePrompt';
+            restoreEl.innerHTML = `
+                <div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:10000;
+                    background:rgba(30,41,59,0.97);border:1px solid rgba(251,191,36,0.3);
+                    border-radius:14px;padding:16px 24px;box-shadow:0 8px 32px rgba(0,0,0,0.5);
+                    display:flex;align-items:center;gap:16px;max-width:520px;">
+                    <div style="font-size:22px;">🕐</div>
+                    <div style="flex:1;">
+                        <div style="font-size:14px;color:#fbbf24;font-weight:600;">上次听到 ${timeStr}（第${segNum}段）</div>
+                        <div style="font-size:12px;color:#64748b;margin-top:2px;">${elapsed > 0 ? elapsed + ' 分钟前保存' : '刚刚保存'}</div>
+                    </div>
+                    <button onclick="restoreLastPosition()" style="background:#fbbf24;color:#0f172a;font-weight:600;
+                        border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;">
+                        ▶ 继续
+                    </button>
+                    <button onclick="dismissRestore()" style="background:#334155;color:#94a3b8;
+                        border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;">
+                        从头开始
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(restoreEl);
+
+            // 记录恢复数据供后续使用
+            window.__restoreData = data;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // 执行恢复
+    function restoreLastPosition() {
+        const data = window.__restoreData;
+        if (!data || !audio) return;
+        audio.currentTime = data.currentTime;
+        setSpeed(data.playbackRate || 1);
+        dismissRestore();
+        // 播放
+        audio.play().catch(()=>{});
+    }
+
+    // 关闭恢复提示
+    function dismissRestore() {
+        const el = document.getElementById('restorePrompt');
+        if (el) el.remove();
+        window.__restoreData = null;
+    }
+
+    // 手动清除所有保存的进度
+    function clearAllProgress() {
+        localStorage.removeItem(LS_KEY);
+        stopAutoSave();
+    }
+
+    // ==================== 画中画初始化 ====================
+    function initPipButton() {
+        const btn = document.getElementById('pipBtn');
+        if (!btn) return;
+        if (!pipSupported) {
+            btn.style.display = 'none';
+        }
+    }
+    initPipButton();
+
+    // 页面关闭前保存进度
+    window.addEventListener('beforeunload', () => {
+        saveProgress();
+    });
+
+    // ==================== 底部浮动栏滚动检测 ====================
+    function setupBottomBar() {
+        const bottomBar = document.getElementById('bottomBar');
+        const playBtn = document.getElementById('playBtn');
+        const contentArea = document.getElementById('contentArea');
+
+        // 检测播放控制区是否在视口内
+        function checkVisibility() {
+            if (!playBtn) return;
+            const rect = playBtn.getBoundingClientRect();
+            const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+            if (isReady && !isVisible) {
+                bottomBar.classList.add('visible');
+            } else {
+                bottomBar.classList.remove('visible');
+            }
+        }
+
+        // 监听页面滚动
+        window.addEventListener('scroll', checkVisibility, { passive: true });
+        // 监听右侧文本区域滚动（主要滚动源）
+        if (contentArea) {
+            contentArea.addEventListener('scroll', checkVisibility, { passive: true });
+        }
+        // 定时检查
+        setInterval(checkVisibility, 1000);
+
+        // 底部进度条拖动
+        const bottomProgress = document.getElementById('bottomProgress');
+        bottomProgress.addEventListener('input', (e) => {
+            if (audio && audio.duration) {
+                audio.currentTime = (e.target.value / 100) * audio.duration;
+            }
+        });
+    }
+    setupBottomBar();
+
+    // 同步底部浮动栏状态
+    function updateBottomBar() {
+        if (!isReady) return;
+        const bottomPlay = document.getElementById('bottomPlay');
+        const bottomProgress = document.getElementById('bottomProgress');
+        const bottomCur = document.getElementById('bottomCur');
+        const bottomTot = document.getElementById('bottomTot');
+
+        if (bottomPlay) {
+            bottomPlay.disabled = false;
+            bottomPlay.textContent = audio && !audio.paused ? '⏸' : '▶';
+        }
+        if (bottomProgress && audio) {
+            bottomProgress.disabled = false;
+            if (audio.duration) {
+                bottomProgress.value = (audio.currentTime / audio.duration) * 100;
+            }
+        }
+        if (bottomCur) bottomCur.textContent = formatTime(audio ? audio.currentTime : 0);
+        if (bottomTot) bottomTot.textContent = formatTime(audio && audio.duration ? audio.duration : 0);
+
+        // 同步速度按钮
+        document.querySelectorAll('.bottom-spd').forEach(btn => {
+            btn.classList.toggle('active', parseFloat(btn.textContent) === playbackRate);
+        });
+    }
+
+    // ==================== 键盘快捷键 ====================
+    document.addEventListener('keydown', (e) => {
+        // 如果在输入框中，不拦截
+        if (e.target.tagName === 'INPUT' && e.target.type === 'text') {
+            if (e.code === 'Escape') e.target.blur();
+            return;
+        }
+
+        switch (e.code) {
+            case 'Space':
+                e.preventDefault();
+                togglePlay();
+                break;
+            case 'ArrowLeft':
+                e.preventDefault();
+                seek(-5);
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                seek(5);
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                prevSegment();
+                break;
+            case 'ArrowDown':
+                e.preventDefault();
+                nextSegment();
+                break;
+            case 'KeyF':
+                if (!e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                    document.getElementById('searchBox').focus();
+                }
+                break;
+            case 'Escape':
+                document.getElementById('searchBox').blur();
+                break;
+        }
+    });
+
+    // ==================== 工具函数 ====================
+    function formatTime(seconds) {
+        if (!isFinite(seconds) || seconds < 0) return '00:00';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        if (h > 0) {
+            return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+        return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML;
+    }
+    </script>
+</body>
+</html>
